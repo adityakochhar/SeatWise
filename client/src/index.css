@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-ink font-sans text-neutral-100 antialiased;
+  /* Two soft glows, teal top-left and indigo bottom-right, give the dark page some depth. */
+  background-image:
+    radial-gradient(60rem 36rem at 0% -10%, rgb(60 221 190 / 0.09), transparent 60%),
+    radial-gradient(50rem 36rem at 100% 110%, rgb(129 140 248 / 0.07), transparent 60%);
+  background-attachment: fixed;
+}
+
+::selection {
+  @apply bg-accent/30 text-white;
+}
+
+#root {
+  @apply flex min-h-screen flex-col;
+}
+
+/*
+  The shared building blocks of the theme. Everything else is plain Tailwind
+  utilities written in the components themselves.
+*/
+@layer components {
+  /* Frosted-glass surface for cards, panels and bars. */
+  .glass {
+    @apply rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl;
+  }
+
+  /* Small monospace label that sits above a heading, e.g. "NOW SHOWING". */
+  .eyebrow {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-accent;
+  }
+
+  /* Teal-to-indigo gradient for a few words of a headline. */
+  .text-gradient {
+    @apply bg-gradient-to-r from-accent via-teal-300 to-indigo-400 bg-clip-text text-transparent;
+  }
+}
