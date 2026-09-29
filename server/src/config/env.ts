@@ -16,4 +16,7 @@ export const env = {
   jwtSecret: required("JWT_SECRET"),
   clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
   holdMinutes: Number(process.env.HOLD_MINUTES ?? 5),
+  // Optional. Without these, ticket emails are skipped.
+  brevoApiKey: process.env.BREVO_API_KEY ?? "",
+  mailFrom: process.env.MAIL_FROM ?? "",
 };

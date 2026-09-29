@@ -3,12 +3,14 @@ import { Types, type HydratedDocument } from "mongoose";
 import { env } from "../../config/env";
 import { ApiError } from "../../lib/api-error";
 import { toObjectId } from "../../lib/ids";
+import { logger } from "../../lib/logger";
 import { emitSeatsChanged } from "../../realtime/socket";
 import { CinemaModel } from "../cinemas/cinema.model";
 import { ScreenModel } from "../cinemas/screen.model";
 import { MovieModel } from "../movies/movie.model";
 import { SeatModel, type SeatStatus } from "../shows/seat.model";
 import { ShowModel, type Show } from "../shows/show.model";
+import { sendTicketEmail } from "./booking.emails";
 import { BookingModel, type Booking, type BookingStatus } from "./booking.model";
 import type { HoldSeatsInput } from "./booking.schemas";
 
@@ -116,7 +118,12 @@ export async function confirmBooking(userId: string, bookingId: string): Promise
   await booking.save();
 
   notifySeatChange(booking.showId, booking.seatIds, "booked");
-  return loadBookingView(booking);
+  const view = await loadBookingView(booking);
+
+  // Send the ticket in the background. If the email fails, the booking still stands.
+  sendTicketEmail(userId, view).catch((err) => logger.error("Could not send ticket email", err));
+
+  return view;
 }
 
 export async function cancelBooking(userId: string, bookingId: string): Promise<BookingView> {

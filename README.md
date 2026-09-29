@@ -14,6 +14,7 @@ SeatWise lets you pick a city and a show, choose seats on a seat map, and hold t
 - Seats are held for 5 minutes with a countdown at checkout; if time runs out they go back on sale
 - Live seat updates over Socket.IO for holds, bookings, releases and expiries
 - Simulated payment that gives you a ticket code
+- Ticket confirmation email with the movie, show time, cinema, seats and ticket code (sent through Brevo)
 - My bookings page showing confirmed, pending, cancelled and expired bookings
 - Sign up and log in with JWT, with a password strength meter on sign up
 - Admin dashboard to add cinemas, screens, movies and shows, and see bookings, revenue and occupancy
@@ -25,6 +26,7 @@ SeatWise lets you pick a city and a show, choose seats on a seat map, and hold t
 - **Backend:** Node.js, Express, TypeScript, Mongoose, Socket.IO, Zod, JWT, bcryptjs
 - **Database:** MongoDB (MongoDB Atlas for the live version)
 - **Testing:** Jest, Supertest, mongodb-memory-server
+- **Email:** Brevo HTTP API (Render's free plan blocks SMTP, so emails go over HTTP)
 - **Tools:** Docker Compose, GitHub Actions (typecheck, test and build on every push to `main`), Render for hosting
 
 ## Screenshots
@@ -60,6 +62,8 @@ Demo logins (also created locally by `npm run seed`):
 | User  | demo@seatwise.dev  | Demo@123  |
 
 To see the live updates, open the same show in two windows (one of them incognito) and hold seats in one of them.
+
+The demo accounts don't have real inboxes, so to get the ticket email, sign up with your own email and book a show. If it doesn't show up, check your spam folder.
 
 ## Getting Started
 
@@ -98,6 +102,10 @@ Then edit `server/.env`:
 | `JWT_SECRET` | any long random string, used to sign login tokens |
 | `CLIENT_ORIGIN` | the frontend URL the API accepts requests from (`http://localhost:5173`) |
 | `HOLD_MINUTES` | how long seats stay held (`5`) |
+| `BREVO_API_KEY` | optional, Brevo API key for ticket emails |
+| `MAIL_FROM` | optional, the sender email verified in Brevo |
+
+If `BREVO_API_KEY` or `MAIL_FROM` is empty, the app works normally and just skips the emails. To turn emails on, create a free Brevo account, verify a sender email under Senders, and create an API key under SMTP & API.
 
 `client/.env` only has `VITE_API_URL`, which points to the API (`http://localhost:4000`).
 
@@ -131,7 +139,7 @@ docker compose up --build
 docker compose exec api node dist/scripts/seed.js
 ```
 
-Then open http://localhost:8080.
+Then open http://localhost:8080. Ticket emails are skipped in this setup, since `docker-compose.yml` doesn't pass the Brevo settings.
 
 **Running the tests:**
 
@@ -157,17 +165,20 @@ SeatWise/
 │       └── lib/             formatting, dates, validation and query keys
 ├── server/                  Express API
 │   ├── src/
+│   │   ├── config/          environment variables and database connection
 │   │   ├── modules/         auth, users, cinemas, movies, shows, bookings, admin, catalogue
 │   │   ├── middleware/      auth, validation, error handling
+│   │   ├── lib/             small helpers: JWT, errors, logger, mailer.ts (sends emails through Brevo)
 │   │   ├── realtime/        Socket.IO setup
 │   │   ├── jobs/            releases expired holds every 30 seconds
 │   │   └── scripts/seed.ts  demo data
 │   └── tests/               API tests
+├── screenshots/             images used in this README
 ├── docker-compose.yml
 └── .github/workflows/ci.yml
 ```
 
-Backend modules are split by file type: `*.model.ts` (Mongoose schema), `*.schemas.ts` (Zod validation), `*.service.ts` (the logic) and `*.routes.ts` (Express routes).
+Backend modules are split by file type: `*.model.ts` (Mongoose schema), `*.schemas.ts` (Zod validation), `*.service.ts` (the logic) and `*.routes.ts` (Express routes). The bookings module also has `booking.emails.ts`, which writes the ticket email.
 
 ## How It Works
 
@@ -175,9 +186,10 @@ Backend modules are split by file type: `*.model.ts` (Mongoose schema), `*.schem
 2. You select up to 6 seats and click Hold. The server claims each seat with a single conditional update that only succeeds if the seat is still available or its hold has expired. MongoDB applies writes to one document one at a time, so two requests for the same seat can't both win.
 3. If some seats were taken first, the server returns `409 Conflict` with those seat labels and releases the seats it did get. Otherwise the seats are held for 5 minutes, and everyone viewing the show sees them change.
 4. At checkout you get a countdown. Paying (simulated) confirms only the seats still held by your booking and gives you a ticket code. Releasing, or letting the timer run out, puts the seats back on sale.
-5. A hold's expiry is stored as a timestamp, so an expired hold counts as free even if the server restarts. A background job also cleans up expired holds every 30 seconds.
+5. After a successful payment, the server emails you the ticket: movie, show time, cinema, seats, amount and ticket code. The email is sent in the background, so if it fails, the booking still goes through and the error is only logged.
+6. A hold's expiry is stored as a timestamp, so an expired hold counts as free even if the server restarts. A background job also cleans up expired holds every 30 seconds.
 
-The seat-claiming logic is in `server/src/modules/bookings/booking.service.ts`, and the two-requests-one-seat test is in `server/tests/bookings.test.ts`.
+The seat-claiming logic is in `server/src/modules/bookings/booking.service.ts`, the ticket email is in `booking.emails.ts` next to it, and the two-requests-one-seat test is in `server/tests/bookings.test.ts`.
 
 ## API Endpoints
 
